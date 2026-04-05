@@ -7,6 +7,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # Dependencies and build output
+laboratorio-peces/hardware/.pio/
 laboratorio-peces/hardware/node_modules/
 laboratorio-peces/web/node_modules/
 laboratorio-peces/web/dist/
