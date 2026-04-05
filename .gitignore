@@ -1,0 +1,34 @@
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies and build output
+laboratorio-peces/web/node_modules/
+laboratorio-peces/web/dist/
+laboratorio-peces/web/dist-ssr/
+
+# Environment and local-only files
+laboratorio-peces/web/.env
+laboratorio-peces/web/.env.*
+!laboratorio-peces/web/.env.example
+laboratorio-peces/**/*.local
+laboratorio-peces/supabase/.branches/
+laboratorio-peces/supabase/.temp/
+laboratorio-peces/supabase/.env.keys
+laboratorio-peces/supabase/.env.local
+laboratorio-peces/supabase/.env.*.local
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
