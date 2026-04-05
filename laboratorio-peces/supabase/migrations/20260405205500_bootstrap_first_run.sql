@@ -29,7 +29,12 @@ create policy "anon can insert temperaturas"
 on public.temperaturas
 for insert
 to anon
-with check (true);
+with check (
+  sensor_id in ('pecera_1', 'pecera_2', 'sensor-demo-001')
+  and valor_temp between 0 and 60
+  and created_at >= now() - interval '1 day'
+  and created_at <= now() + interval '10 minutes'
+);
 
 drop policy if exists "public can read temperaturas" on public.temperaturas;
 create policy "public can read temperaturas"
@@ -55,30 +60,41 @@ create index if not exists idx_comandos_sensor_estado_created_at
 
 alter table public.comandos enable row level security;
 
-grant select, insert, update on table public.comandos to anon, authenticated;
-grant usage, select on sequence public.comandos_id_seq to anon, authenticated;
+grant select, insert, update on table public.comandos to authenticated;
+grant usage, select on sequence public.comandos_id_seq to authenticated;
 
+drop policy if exists "authenticated can insert comandos" on public.comandos;
 drop policy if exists "public can insert comandos" on public.comandos;
-create policy "public can insert comandos"
+create policy "authenticated can insert comandos"
 on public.comandos
 for insert
-to anon, authenticated
-with check (estado in ('pendiente', 'completado'));
+to authenticated
+with check (
+  accion = 'forzar_lectura'
+  and sensor_id in ('pecera_1', 'pecera_2')
+  and estado = 'pendiente'
+);
 
+drop policy if exists "authenticated can read comandos" on public.comandos;
 drop policy if exists "public can read comandos" on public.comandos;
-create policy "public can read comandos"
+create policy "authenticated can read comandos"
 on public.comandos
 for select
-to anon, authenticated
+to authenticated
 using (true);
 
+drop policy if exists "authenticated can update comandos" on public.comandos;
 drop policy if exists "public can update comandos" on public.comandos;
-create policy "public can update comandos"
+create policy "authenticated can update comandos"
 on public.comandos
 for update
-to anon, authenticated
-using (true)
-with check (estado in ('pendiente', 'completado'));
+to authenticated
+using (sensor_id in ('pecera_1', 'pecera_2'))
+with check (
+  accion = 'forzar_lectura'
+  and sensor_id in ('pecera_1', 'pecera_2')
+  and estado in ('pendiente', 'completado')
+);
 
 -- =========================
 -- Mock data inicial

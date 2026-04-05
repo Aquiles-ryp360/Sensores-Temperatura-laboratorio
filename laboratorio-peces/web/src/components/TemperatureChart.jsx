@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import mqtt from 'mqtt'
 import {
   CartesianGrid,
   Line,
@@ -11,6 +12,9 @@ import {
 import { supabase } from '../lib/supabaseClient'
 
 const DEFAULT_TANK = 'pecera_1'
+const MQTT_COMMAND_TOPIC = 'laboratorio/peces/comandos/tanque_1'
+const MQTT_CONNECT_TIMEOUT_MS = 10_000
+const AUTO_REFRESH_DELAY_MS = 2_500
 
 const TANK_OPTIONS = [
   { value: 'pecera_1', label: 'Pecera 1' },
@@ -118,6 +122,101 @@ function getMinTickGap(timeRange, pointCount) {
   }
 
   return 24
+}
+
+function delay(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
+}
+
+function normalizeMqttHost(rawHost) {
+  if (!rawHost) {
+    return ''
+  }
+
+  if (/^[a-z]+:\/\//i.test(rawHost)) {
+    return rawHost
+  }
+
+  const sanitizedHost = rawHost.trim().replace(/^\/+/, '')
+  const [hostPort, ...pathSegments] = sanitizedHost.split('/')
+  const path = pathSegments.length ? `/${pathSegments.join('/')}` : '/mqtt'
+  const hostWithPort = /:\d+$/.test(hostPort) ? hostPort : `${hostPort}:8084`
+
+  return `wss://${hostWithPort}${path}`
+}
+
+function publishForceReadingCommand() {
+  const { VITE_MQTT_HOST, VITE_MQTT_USER, VITE_MQTT_PASSWORD } = import.meta.env
+  const mqttUrl = normalizeMqttHost(VITE_MQTT_HOST)
+
+  if (!mqttUrl || !VITE_MQTT_USER || !VITE_MQTT_PASSWORD) {
+    throw new Error(
+      'Faltan variables MQTT. Revisa VITE_MQTT_HOST, VITE_MQTT_USER y VITE_MQTT_PASSWORD.',
+    )
+  }
+
+  return new Promise((resolve, reject) => {
+    const client = mqtt.connect(mqttUrl, {
+      username: VITE_MQTT_USER,
+      password: VITE_MQTT_PASSWORD,
+      clean: true,
+      reconnectPeriod: 0,
+      connectTimeout: MQTT_CONNECT_TIMEOUT_MS,
+    })
+    let settled = false
+
+    function cleanup() {
+      client.removeListener('connect', handleConnect)
+      client.removeListener('error', handleError)
+    }
+
+    function fail(mqttError) {
+      if (settled) {
+        return
+      }
+
+      settled = true
+      cleanup()
+      client.end(true)
+      reject(mqttError instanceof Error ? mqttError : new Error('No se pudo enviar el comando MQTT.'))
+    }
+
+    function succeed() {
+      if (settled) {
+        return
+      }
+
+      settled = true
+      cleanup()
+      client.end()
+      resolve()
+    }
+
+    function handleConnect() {
+      const payload = JSON.stringify({
+        comando: 'forzar_lectura',
+        timestamp: Date.now(),
+      })
+
+      client.publish(MQTT_COMMAND_TOPIC, payload, { qos: 1 }, (publishError) => {
+        if (publishError) {
+          fail(publishError)
+          return
+        }
+
+        succeed()
+      })
+    }
+
+    function handleError(mqttError) {
+      fail(mqttError)
+    }
+
+    client.on('connect', handleConnect)
+    client.on('error', handleError)
+  })
 }
 
 async function fetchTemperatures({ tankId, timeRange }) {
@@ -315,8 +414,10 @@ export default function TemperatureChart() {
       })
 
       setChartData(data)
+      return data
     } catch (fetchError) {
       setError(fetchError.message)
+      throw fetchError
     } finally {
       setRefreshing(false)
     }
@@ -327,24 +428,18 @@ export default function TemperatureChart() {
     setCommandFeedback('')
     setCommandError('')
 
-    const { error: insertError } = await supabase.from('comandos').insert([
-      {
-        accion: 'forzar_lectura',
-        sensor_id: selectedTank,
-        estado: 'pendiente',
-      },
-    ])
-
-    if (insertError) {
-      setCommandError(insertError.message)
+    try {
+      await publishForceReadingCommand()
+      setCommandFeedback('Comando seguro enviado. Esperando lectura del sensor...')
+      await delay(AUTO_REFRESH_DELAY_MS)
+      await handleRefreshChart()
+      setCommandFeedback('Lectura completada. Grafica y KPIs sincronizados.')
+    } catch (mqttError) {
+      setCommandFeedback('')
+      setCommandError(mqttError.message)
+    } finally {
       setSendingCommand(false)
-      return
     }
-
-    setCommandFeedback(
-      `Comando enviado a ${getTankLabel(selectedTank)}. Presiona Actualizar Grafica en unos segundos.`,
-    )
-    setSendingCommand(false)
   }
 
   const latestReading = chartData[chartData.length - 1]
@@ -459,10 +554,10 @@ export default function TemperatureChart() {
             <button
               type="button"
               onClick={handleForceHardwareReading}
-              disabled={sendingCommand}
+              disabled={sendingCommand || refreshing}
               className="rounded-2xl border border-white/15 bg-white/[0.08] px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/[0.14] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {sendingCommand ? 'Enviando comando...' : 'Forzar Lectura de Hardware'}
+              {sendingCommand ? 'Midiendo y sincronizando...' : 'Forzar Lectura de Hardware'}
             </button>
           </div>
         </div>

@@ -31,7 +31,12 @@ create policy "anon can insert temperaturas"
 on public.temperaturas
 for insert
 to anon
-with check (true);
+with check (
+  sensor_id in ('pecera_1', 'pecera_2', 'sensor-demo-001')
+  and valor_temp between 0 and 60
+  and created_at >= now() - interval '1 day'
+  and created_at <= now() + interval '10 minutes'
+);
 
 drop policy if exists "public can read temperaturas" on public.temperaturas;
 create policy "public can read temperaturas"

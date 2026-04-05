@@ -1,0 +1,13 @@
+{
+  "name": "laboratorio-peces-hardware",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Simulador MQTT para el gemelo digital del ESP32",
+  "scripts": {
+    "simulador": "node simulador_mqtt.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "mqtt": "^5.15.1"
+  }
+}

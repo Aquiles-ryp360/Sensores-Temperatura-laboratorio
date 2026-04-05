@@ -7,11 +7,16 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # Dependencies and build output
+laboratorio-peces/hardware/node_modules/
 laboratorio-peces/web/node_modules/
 laboratorio-peces/web/dist/
 laboratorio-peces/web/dist-ssr/
+laboratorio-peces/web/.vercel/
 
 # Environment and local-only files
+laboratorio-peces/hardware/.env
+laboratorio-peces/hardware/.env.*
+!laboratorio-peces/hardware/.env.example
 laboratorio-peces/web/.env
 laboratorio-peces/web/.env.*
 !laboratorio-peces/web/.env.example
@@ -21,6 +26,7 @@ laboratorio-peces/supabase/.temp/
 laboratorio-peces/supabase/.env.keys
 laboratorio-peces/supabase/.env.local
 laboratorio-peces/supabase/.env.*.local
+laboratorio-peces/supabase/.history/
 
 # Editor and OS files
 .DS_Store
